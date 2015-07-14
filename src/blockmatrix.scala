@@ -1,10 +1,10 @@
 import org.apache.spark.mllib.linalg.Matrices
 import org.apache.spark.mllib.linalg.distributed.BlockMatrix
 val parallelism = 5
-val rows = 1000
-val columns = 100
+val blockSize = 10000
+val rows = parallelism * blockSize
+val columns = blockSize
 val size = rows * columns
-val blockSize = 100
 assert(rows % blockSize == 0)
 assert(columns % blockSize == 0)
 val rowBlocks = rows / blockSize
@@ -17,7 +17,7 @@ bm.validate()
 val mb = bm.transpose.cache()
 mb.validate()
 val t = System.nanoTime()
-val ata = bm.multiply(mb)
+val ata = mb.multiply(bm)
 ata.validate()
 println(rows + "x" + columns + ", block:" + blockSize + "\t" + (System.nanoTime() - t) / 1e9) 
 
