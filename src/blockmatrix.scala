@@ -1,23 +1,43 @@
+// Block-diagonal matrix test
+// R = M * M
+// number of multiplications == parallelism
 import org.apache.spark.mllib.linalg.Matrices
 import org.apache.spark.mllib.linalg.distributed.BlockMatrix
 val parallelism = 5
 val blockSize = 10000
-val rows = parallelism * blockSize
-val columns = blockSize
-val size = rows * columns
-assert(rows % blockSize == 0)
-assert(columns % blockSize == 0)
-val rowBlocks = rows / blockSize
-val columnBlocks = columns / blockSize
+val rowBlocks = parallelism
+val columnBlocks = rowBlocks
+val rows = blockSize * rowBlocks
+val columns = blockSize * columnBlocks
 val rdd = sc.parallelize( { 
-	for(i <- 0 until rowBlocks; j <- 0 until columnBlocks) yield (i, j) 
-	}, parallelism).map( coord => (coord, Matrices.rand(blockSize, blockSize, util.Random.self)))
+  for(i <- 0 until rowBlocks) yield (i, i) 
+  }, parallelism).map( coord => (coord, Matrices.rand(blockSize, blockSize, util.Random.self)))
+val bm = new BlockMatrix(rdd, blockSize, blockSize).cache()
+bm.validate()
+val t = System.nanoTime()
+val ata = bm.multiply(bm)
+ata.validate()
+println(rows + "x" + columns + ", block:" + blockSize + "\t" + (System.nanoTime() - t) / 1e9) 
+
+// Block-columnar matrix test
+// R = M * M^T
+// number of multiplications == parallelism^2
+import org.apache.spark.mllib.linalg.Matrices
+import org.apache.spark.mllib.linalg.distributed.BlockMatrix
+val parallelism = 2
+val blockSize = 10000
+val rowBlocks = parallelism
+val columnBlocks = 1
+val rows = blockSize * rowBlocks
+val columns = blockSize * columnBlocks
+val rdd = sc.parallelize( { 
+  for(i <- 0 until rowBlocks) yield (i, 0) 
+  }, parallelism).map( coord => (coord, Matrices.rand(blockSize, blockSize, util.Random.self)))
 val bm = new BlockMatrix(rdd, blockSize, blockSize).cache()
 bm.validate()
 val mb = bm.transpose.cache()
 mb.validate()
 val t = System.nanoTime()
-val ata = mb.multiply(bm)
+val ata = bm.multiply(mb)
 ata.validate()
 println(rows + "x" + columns + ", block:" + blockSize + "\t" + (System.nanoTime() - t) / 1e9) 
-
